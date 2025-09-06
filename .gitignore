@@ -1,18 +1,230 @@
-# This .gitignore is appropriate for repositories deployed to GitHub Pages and using
-# a Gemfile as specified at https://github.com/github/pages-gem#conventional
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Farm Clicker com Códigos</title>
+<style>
+body{margin:0;font-family:Arial,sans-serif;text-align:center;overflow:hidden;background:linear-gradient(270deg,#ff5f6d,#ffc371,#5ee7df);background-size:600% 600%;animation:fundoAnim 20s ease infinite}
+@keyframes fundoAnim{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+h1{color:white;text-shadow:2px 2px 5px #000}
+button{margin:5px;padding:10px 20px;font-size:16px;cursor:pointer;border-radius:8px;border:none;background:rgba(255,255,255,0.8)}
+#status{margin-top:20px;font-size:18px;color:white;text-shadow:1px 1px 3px #000}
+.lista-melhorias{display:none;margin:10px auto;text-align:left;width:300px;background:rgba(255,255,255,0.8);border-radius:10px;padding:10px}
+.lista-melhorias button{display:block;width:100%;margin:5px 0;text-align:left}
+.barra-container{background:#ccc;width:100%;height:20px;border-radius:10px;overflow:hidden;margin-top:5px}
+.barra{height:100%;width:0%;background:#27ae60;transition:width 0.5s}
+.item-voando{position:absolute;width:40px;height:40px;background-size:contain;background-repeat:no-repeat;z-index:0}
+</style>
+</head>
+<body>
+<h1>Farm Clicker</h1>
+<button id="clickBtn">Clicar!</button>
+<button id="toggleMelhoriasBtn">Mostrar Melhorias</button>
+<div class="lista-melhorias" id="melhoriasContainer"></div>
+<button id="toggleAutoBtn">Mostrar Melhorias Automáticas</button>
+<div class="lista-melhorias" id="autoContainer"></div>
+<button id="renascerBtn">Renascimento</button>
+<br>
+<input type="text" id="codigoInput" placeholder="Digite código de resgate">
+<button id="resgatarBtn">Resgatar Código</button>
+<div id="status"></div>
 
-# Basic Jekyll gitignores (synchronize to Jekyll.gitignore)
-_site/
-.sass-cache/
-.jekyll-cache/
-.jekyll-metadata
+<script>
+let dinheiro=0,dinheiroPorClick=1,renascimentos=0,ganhoAutomatico=0;
+let melhorias=[{nome:"Mão de obra",custo:50,bonus:1,barra:0},{nome:"Trator",custo:200,bonus:5,barra:0},{nome:"Estufa",custo:500,bonus:10,barra:0},{nome:"Fazenda Premium",custo:2000,bonus:25,barra:0}];
+let autoMelhorias=[{nome:"Animais",custo:100,ganho:1,barra:0},{nome:"Irrigação",custo:400,ganho:5,barra:0},{nome:"Drone",custo:1000,ganho:10,barra:0},{nome:"Fábrica Fertilizante",custo:5000,ganho:50,barra:0}];
 
-# Additional Ruby/bundler ignore for when you run: bundle install
-/vendor
+// Códigos de resgate: chave: recompensa
+let codigos = {
+    "BOOM10": 10,       // +10 dinheiro
+    "SUPER50": 50,      // +50 dinheiro
+    "MEGA100": 100,     // +100 dinheiro
+    "CLICKBOOST": 5     // +5 dinheiroPorClick
+};
 
-# Specific ignore for GitHub Pages
-# GitHub Pages will always use its own deployed version of pages-gem 
-# This means GitHub Pages will NOT use your Gemfile.lock and therefore it is
-# counterproductive to check this file into the repository.
-# Details at https://github.com/github/pages-gem/issues/768
-Gemfile.lock
+function atualizarStatus(){
+    document.getElementById('status').innerHTML=
+    `Dinheiro: ${dinheiro} <br>Dinheiro por click: ${dinheiroPorClick} <br>Ganho automático: ${ganhoAutomatico}/seg <br>Renascimentos: ${renascimentos}`;
+}
+
+function atualizarMelhorias(){
+    const container=document.getElementById('melhoriasContainer');
+    container.innerHTML='';
+    melhorias.forEach((m,i)=>{
+        const btn=document.createElement('button');
+        btn.innerHTML=`${m.nome} (Custo: ${m.custo}, +${m.bonus}/click)
+        <div class="barra-container"><div class="barra" style="width:${m.barra}%"></div></div>`;
+        btn.onclick=()=>comprarMelhoria(i);
+        container.appendChild(btn);
+    });
+}
+
+function atualizarAuto(){
+    const container=document.getElementById('autoContainer');
+    container.innerHTML='';
+    autoMelhorias.forEach((m,i)=>{
+        const btn=document.createElement('button');
+        btn.innerHTML=`${m.nome} (Custo: ${m.custo}, +${m.ganho}/seg)
+        <div class="barra-container"><div class="barra" style="width:${m.barra}%"></div></div>`;
+        btn.onclick=()=>comprarAuto(i);
+        container.appendChild(btn);
+    });
+}
+
+function criarItemVoando(tipo){
+    const item=document.createElement('div');
+    item.className='item-voando';
+    item.style.top=(Math.random()*window.innerHeight*0.8)+'px';
+    item.style.left='-50px';
+    if(tipo==='moeda')item.style.backgroundImage='url(https://cdn-icons-png.flaticon.com/512/833/833314.png)';
+    if(tipo==='estrela')item.style.backgroundImage='url(https://cdn-icons-png.flaticon.com/512/616/616408.png)';
+    document.body.appendChild(item);
+    let pos=-50;
+    const anim=setInterval(()=>{
+        pos+=5;
+        item.style.left=pos+'px';
+        if(pos>window.innerWidth+50){clearInterval(anim);item.remove();}
+    },20);
+}
+
+function comprarMelhoria(i){
+    let m=melhorias[i];
+    if(dinheiro>=m.custo){
+        if(confirm(`Tem certeza que deseja comprar "${m.nome}" por ${m.custo} moedas?`)){
+            dinheiro-=m.custo;
+            dinheiroPorClick+=m.bonus*(1+renascimentos*0.5);
+            m.custo=Math.floor(m.custo*1.5);
+            m.barra=0;
+            atualizarStatus();atualizarMelhorias();criarItemVoando('moeda');
+        }
+    }else alert("Dinheiro insuficiente!");
+}
+
+function comprarAuto(i){
+    let m=autoMelhorias[i];
+    if(dinheiro>=m.custo){
+        if(confirm(`Tem certeza que deseja comprar "${m.nome}" por ${m.custo} moedas?`)){
+            dinheiro-=m.custo;
+            ganhoAutomatico+=m.ganho*(1+renascimentos*0.5);
+            m.custo=Math.floor(m.custo*2);
+            m.barra=0;
+            atualizarStatus();atualizarAuto();criarItemVoando('estrela');
+        }
+    }else alert("Dinheiro insuficiente!");
+}
+
+document.getElementById('clickBtn').onclick=()=>{
+    dinheiro+=dinheiroPorClick;
+    melhorias.forEach(m=>m.barra=Math.min(100,m.barra+dinheiroPorClick/10));
+    atualizarStatus();atualizarMelhorias();criarItemVoando('moeda');
+};
+
+document.getElementById('renascerBtn').onclick=()=>{
+    if(dinheiro>=1000){
+        dinheiro=0;dinheiroPorClick=1;ganhoAutomatico=0;renascimentos+=1;
+        melhorias.forEach(m=>m.barra=0);autoMelhorias.forEach(m=>m.barra=0);
+        atualizarStatus();atualizarMelhorias();atualizarAuto();criarItemVoando('estrela');
+        alert(`Você renasceu! Total de renascimentos: ${renascimentos}`);
+    }else alert("Precisa de pelo menos 1000 moedas para renascer!");
+};
+
+document.getElementById('toggleMelhoriasBtn').onclick=()=>{
+    const div=document.getElementById('melhoriasContainer');
+    div.style.display=div.style.display==='block'?'none':'block';
+};
+
+document.getElementById('toggleAutoBtn').onclick=()=>{
+    const div=document.getElementById('autoContainer');
+    div.style.display=div.style.display==='block'?'none':'block';
+};
+
+// Resgate de códigos
+document.getElementById('resgatarBtn').onclick=()=>{
+    const codigo=document.getElementById('codigoInput').value.toUpperCase();
+    if(codigo in codigos){
+        if(codigo==="CLICKBOOST"){
+            dinheiroPorClick += codigos[codigo];
+            alert(`Código resgatado! +${codigos[codigo]} Dinheiro por click`);
+        } else {
+            dinheiro += codigos[codigo];
+            alert(`Código resgatado! +${codigos[codigo]} moedas`);
+        }
+        document.getElementById('codigoInput').value='';
+        atualizarStatus();
+    } else alert("Código inválido!");
+};
+
+setInterval(()=>{
+    dinheiro+=ganhoAutomatico;
+    autoMelhorias.forEach(m=>m.barra=Math.min(100,m.barra+ganhoAutomatico/10));
+    atualizarStatus();atualizarAuto();
+},1000);
+
+atualizarStatus();atualizarMelhorias();atualizarAuto();
+</script>
+</body>
+</html>
+<style>
+#clickBtn{
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform:translate(-50%, -50%);
+    padding:20px 40px;
+    font-size:24px;
+    border:none;
+    border-radius:12px;
+    cursor:pointer;
+    color:white;
+    animation:piscando 2s infinite;
+}
+
+/* Animação piscando colorido */
+@keyframes piscando{
+    0%{background-color:#ff0000;}
+    25%{background-color:#00ff00;}
+    50%{background-color:#0000ff;}
+    75%{background-color:#ffff00;}
+    100%{background-color:#ff00ff;}
+}
+</style>
+<style>
+#infoBtn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 15px 25px;
+    font-size: 16px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    display: none; /* Escondido por padrão */
+    z-index: 1000;
+}
+</style>
+
+<button id="infoBtn">Informações</button>
+
+<script>
+const infoBtn = document.getElementById('infoBtn');
+
+// Função para atualizar a visibilidade do botão
+function atualizarInfoBtn() {
+    // Exemplo: se dinheiro < 500, mostrar botão; senão, esconder
+    if(dinheiro < 500){
+        infoBtn.style.display = 'block';
+    } else {
+        infoBtn.style.display = 'none';
+    }
+}
+
+// Chamar atualização a cada 500ms
+setInterval(atualizarInfoBtn, 500);
+
+// Exemplo de clique no botão
+infoBtn.onclick = () => {
+    alert("Você precisa de mais dinheiro para comprar melhorias ou upgrades!");
+};
+</script>
